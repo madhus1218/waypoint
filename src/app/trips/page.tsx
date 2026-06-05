@@ -51,50 +51,96 @@ function formatCoordinate(value: string, directionPositive: string, directionNeg
   return `${Math.abs(num).toFixed(4)}° ${num >= 0 ? directionPositive : directionNegative}`;
 }
 
+function calculateDistanceMiles(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const earthRadiusMiles = 3958.8;
+
+  const latDistance = ((lat2 - lat1) * Math.PI) / 180;
+  const lonDistance = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(lonDistance / 2) *
+      Math.sin(lonDistance / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMiles * c;
+}
+
 function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
   const sortedPoints = [...points].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  const groupedByDate = sortedPoints.reduce<Record<string, TravelPoint[]>>(
-    (groups, point) => {
-      const date = new Date(point.timestamp);
+  const clusters: TravelPoint[][] = [];
+  const maxDistanceMiles = 75;
 
-      const key = Number.isNaN(date.getTime())
-        ? "Unknown date"
-        : date.toISOString().split("T")[0];
+  sortedPoints.forEach((point) => {
+    const lat = Number(point.latitude);
+    const lng = Number(point.longitude);
 
-      if (!groups[key]) {
-        groups[key] = [];
-      }
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return;
+    }
 
-      groups[key].push(point);
-      return groups;
-    },
-    {}
-  );
+    const matchingCluster = clusters.find((cluster) => {
+      const clusterLat =
+        cluster.reduce((sum, item) => sum + Number(item.latitude), 0) /
+        cluster.length;
 
-  return Object.entries(groupedByDate).map(([dateKey, tripPoints], index) => {
-    const firstPoint = tripPoints[0];
+      const clusterLng =
+        cluster.reduce((sum, item) => sum + Number(item.longitude), 0) /
+        cluster.length;
+
+      const distance = calculateDistanceMiles(lat, lng, clusterLat, clusterLng);
+
+      return distance <= maxDistanceMiles;
+    });
+
+    if (matchingCluster) {
+      matchingCluster.push(point);
+    } else {
+      clusters.push([point]);
+    }
+  });
+
+  return clusters.map((tripPoints, index) => {
+    const sortedTripPoints = [...tripPoints].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    const firstPoint = sortedTripPoints[0];
+    const lastPoint = sortedTripPoints[sortedTripPoints.length - 1];
 
     const avgLat =
-      tripPoints.reduce((sum, point) => sum + Number(point.latitude), 0) /
-      tripPoints.length;
+      sortedTripPoints.reduce((sum, point) => sum + Number(point.latitude), 0) /
+      sortedTripPoints.length;
 
     const avgLng =
-      tripPoints.reduce((sum, point) => sum + Number(point.longitude), 0) /
-      tripPoints.length;
+      sortedTripPoints.reduce((sum, point) => sum + Number(point.longitude), 0) /
+      sortedTripPoints.length;
+
+    const startDate = formatDate(firstPoint.timestamp);
+    const endDate = formatDate(lastPoint.timestamp);
 
     return {
-      title: `Detected Trip ${index + 1}`,
-      dates: dateKey === "Unknown date" ? "Unknown date" : formatDate(firstPoint.timestamp),
-      photos: tripPoints.length,
+      title: `Detected Location Cluster ${index + 1}`,
+      dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
+      photos: sortedTripPoints.length,
       coordinates: `${formatCoordinate(
         String(avgLat),
         "N",
         "S"
       )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
-      points: tripPoints,
+      points: sortedTripPoints,
     };
   });
 }
