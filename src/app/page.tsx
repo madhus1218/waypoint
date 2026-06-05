@@ -1,4 +1,5 @@
 import { ArrowRight, Camera, Map, Sparkles, Route } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -35,10 +36,12 @@ export default function Home() {
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <button className="flex items-center justify-center gap-2 rounded-full bg-blue-500 px-7 py-3 font-semibold text-white transition hover:bg-blue-400">
+              <Link
+                href="/upload"
+                className="flex items-center justify-center gap-2 rounded-full bg-blue-500 px-7 py-3 font-semibold text-white transition hover:bg-blue-400">
                 Start mapping
                 <ArrowRight className="h-5 w-5" />
-              </button>
+              </Link>
 
               <button className="rounded-full border border-white/20 px-7 py-3 font-semibold text-white/90 transition hover:border-white/40 hover:bg-white/5">
                 View demo
