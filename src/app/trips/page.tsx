@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import RouteMapPreview from "@/components/RouteMapPreview";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -282,46 +283,7 @@ export default function TripsPage() {
                 </div>
               </div>
 
-              <div className="relative h-[520px] overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-slate-900 to-emerald-950">
-                {points.slice(0, 8).map((point, index) => {
-                  const left = 15 + ((index * 17) % 70);
-                  const top = 18 + ((index * 13) % 62);
-
-                  return (
-                    <div
-                      key={`${point.filename}-${index}`}
-                      className="absolute h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]"
-                      style={{
-                        left: `${left}%`,
-                        top: `${top}%`,
-                      }}
-                      title={point.filename}
-                    />
-                  );
-                })}
-
-                <svg
-                  className="absolute inset-0 h-full w-full"
-                  viewBox="0 0 500 520"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M90 95 C 140 130, 145 155, 175 158 S 245 190, 290 250 S 350 360, 410 425"
-                    stroke="#60a5fa"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeDasharray="12 12"
-                  />
-                </svg>
-
-                <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur">
-                  <p className="text-sm text-slate-300">Generated route</p>
-                  <p className="font-semibold">
-                    {trips.map((trip) => trip.title).join(" → ")}
-                  </p>
-                </div>
-              </div>
+              <RouteMapPreview points={points} />
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <button className="rounded-full bg-blue-500 px-5 py-3 font-semibold text-white transition hover:bg-blue-400">
