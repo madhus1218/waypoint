@@ -1,38 +1,151 @@
-import Link from "next/link";
-import { ArrowLeft, Calendar, Camera, MapPin, Route, Sparkles } from "lucide-react";
+"use client";
 
-const trips = [
-  {
-    title: "Paris, France",
-    dates: "Jan 12, 2026",
-    photos: 2,
-    stops: ["Eiffel Tower", "Central Paris"],
-    coordinates: "48.8566° N, 2.3522° E",
-  },
-  {
-    title: "Metz, France",
-    dates: "Jan 14, 2026",
-    photos: 2,
-    stops: ["Metz Cathedral", "City Center"],
-    coordinates: "49.1193° N, 6.1757° E",
-  },
-  {
-    title: "Zurich, Switzerland",
-    dates: "Jan 18, 2026",
-    photos: 2,
-    stops: ["Old Town", "Lake Zurich"],
-    coordinates: "47.3769° N, 8.5417° E",
-  },
-  {
-    title: "Milan, Italy",
-    dates: "Jan 21, 2026",
-    photos: 2,
-    stops: ["Duomo di Milano", "City Center"],
-    coordinates: "45.4642° N, 9.1900° E",
-  },
-];
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Calendar,
+  Camera,
+  MapPin,
+  Route,
+  Sparkles,
+  Upload,
+} from "lucide-react";
+
+type TravelPoint = {
+  filename: string;
+  latitude: string;
+  longitude: string;
+  timestamp: string;
+};
+
+type GeneratedTrip = {
+  title: string;
+  dates: string;
+  photos: number;
+  coordinates: string;
+  points: TravelPoint[];
+};
+
+function formatDate(timestamp: string) {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatCoordinate(value: string, directionPositive: string, directionNegative: string) {
+  const num = Number(value);
+
+  if (Number.isNaN(num)) {
+    return value;
+  }
+
+  return `${Math.abs(num).toFixed(4)}° ${num >= 0 ? directionPositive : directionNegative}`;
+}
+
+function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
+  const sortedPoints = [...points].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const groupedByDate = sortedPoints.reduce<Record<string, TravelPoint[]>>(
+    (groups, point) => {
+      const date = new Date(point.timestamp);
+
+      const key = Number.isNaN(date.getTime())
+        ? "Unknown date"
+        : date.toISOString().split("T")[0];
+
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+
+      groups[key].push(point);
+      return groups;
+    },
+    {}
+  );
+
+  return Object.entries(groupedByDate).map(([dateKey, tripPoints], index) => {
+    const firstPoint = tripPoints[0];
+
+    const avgLat =
+      tripPoints.reduce((sum, point) => sum + Number(point.latitude), 0) /
+      tripPoints.length;
+
+    const avgLng =
+      tripPoints.reduce((sum, point) => sum + Number(point.longitude), 0) /
+      tripPoints.length;
+
+    return {
+      title: `Detected Trip ${index + 1}`,
+      dates: dateKey === "Unknown date" ? "Unknown date" : formatDate(firstPoint.timestamp),
+      photos: tripPoints.length,
+      coordinates: `${formatCoordinate(
+        String(avgLat),
+        "N",
+        "S"
+      )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
+      points: tripPoints,
+    };
+  });
+}
 
 export default function TripsPage() {
+  const [points, setPoints] = useState<TravelPoint[]>([]);
+
+  useEffect(() => {
+    const savedPoints = localStorage.getItem("waypoint-points");
+
+    if (!savedPoints) {
+      setPoints([]);
+      return;
+    }
+
+    try {
+      const parsedPoints = JSON.parse(savedPoints) as TravelPoint[];
+      setPoints(parsedPoints);
+    } catch {
+      setPoints([]);
+    }
+  }, []);
+
+  const trips = useMemo(() => generateTrips(points), [points]);
+
+  if (points.length === 0) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07111f] px-6 text-white">
+        <section className="max-w-xl rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-3xl bg-blue-500/20 text-blue-300">
+            <Upload className="h-7 w-7" />
+          </div>
+
+          <h1 className="text-3xl font-bold">No metadata uploaded yet.</h1>
+
+          <p className="mt-4 leading-7 text-slate-300">
+            Upload a CSV first so Waypoint can generate your trip timeline from
+            real location points.
+          </p>
+
+          <Link
+            href="/upload"
+            className="mt-7 inline-flex rounded-full bg-blue-500 px-7 py-3 font-semibold text-white transition hover:bg-blue-400"
+          >
+            Upload CSV
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#07111f] px-6 py-8 text-white">
       <section className="mx-auto max-w-6xl">
@@ -53,16 +166,16 @@ export default function TripsPage() {
         <div className="mb-10">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-400/10 px-4 py-2 text-sm text-blue-200">
             <Sparkles className="h-4 w-4" />
-            AI trip inference preview
+            Dynamic trip inference preview
           </div>
 
           <h1 className="max-w-4xl text-4xl font-bold tracking-tight md:text-6xl">
-            Waypoint detected 4 trips from your uploaded metadata.
+            Waypoint detected {trips.length} trip{trips.length === 1 ? "" : "s"} from your uploaded metadata.
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            This preview shows how Waypoint will group timestamped GPS photo
-            data into clean travel stops, routes, and shareable trip histories.
+            This page now reads your uploaded CSV data from the browser and
+            groups timestamped GPS points into trip cards.
           </p>
         </div>
 
@@ -70,7 +183,7 @@ export default function TripsPage() {
           <div className="space-y-4">
             {trips.map((trip, index) => (
               <div
-                key={trip.title}
+                key={`${trip.title}-${trip.dates}`}
                 className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-blue-400/40 hover:bg-white/[0.07]"
               >
                 <div className="mb-4 flex items-start justify-between gap-4">
@@ -80,7 +193,7 @@ export default function TripsPage() {
                   </div>
 
                   <div className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
-                    {trip.photos} photos
+                    {trip.photos} photo{trip.photos === 1 ? "" : "s"}
                   </div>
                 </div>
 
@@ -97,7 +210,11 @@ export default function TripsPage() {
 
                   <div className="flex items-center gap-2">
                     <Camera className="h-4 w-4 text-blue-300" />
-                    {trip.stops.join(" → ")}
+                    {trip.points
+                      .slice(0, 3)
+                      .map((point) => point.filename)
+                      .join(" → ")}
+                    {trip.points.length > 3 ? " ..." : ""}
                   </div>
                 </div>
               </div>
@@ -109,7 +226,9 @@ export default function TripsPage() {
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-400">Route summary</p>
-                  <h2 className="text-2xl font-bold">Europe 2026</h2>
+                  <h2 className="text-2xl font-bold">
+                    {points.length} uploaded points
+                  </h2>
                 </div>
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-300">
@@ -118,10 +237,22 @@ export default function TripsPage() {
               </div>
 
               <div className="relative h-[520px] overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-slate-900 to-emerald-950">
-                <div className="absolute left-[18%] top-[18%] h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]" />
-                <div className="absolute left-[35%] top-[30%] h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]" />
-                <div className="absolute right-[32%] top-[48%] h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]" />
-                <div className="absolute right-[18%] bottom-[18%] h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]" />
+                {points.slice(0, 8).map((point, index) => {
+                  const left = 15 + ((index * 17) % 70);
+                  const top = 18 + ((index * 13) % 62);
+
+                  return (
+                    <div
+                      key={`${point.filename}-${index}`}
+                      className="absolute h-4 w-4 rounded-full bg-blue-300 shadow-[0_0_24px_8px_rgba(147,197,253,0.45)]"
+                      style={{
+                        left: `${left}%`,
+                        top: `${top}%`,
+                      }}
+                      title={point.filename}
+                    />
+                  );
+                })}
 
                 <svg
                   className="absolute inset-0 h-full w-full"
@@ -141,7 +272,7 @@ export default function TripsPage() {
                 <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur">
                   <p className="text-sm text-slate-300">Generated route</p>
                   <p className="font-semibold">
-                    Paris → Metz → Zurich → Milan
+                    {trips.map((trip) => trip.title).join(" → ")}
                   </p>
                 </div>
               </div>

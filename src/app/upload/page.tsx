@@ -44,6 +44,7 @@ export default function UploadPage() {
         }
 
         setPoints(validRows);
+        localStorage.setItem("waypoint-points", JSON.stringify(validRows));
       },
       error: () => {
         setError("Something went wrong while parsing the CSV file.");
