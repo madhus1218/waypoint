@@ -1,0 +1,102 @@
+[
+  {
+    "cluster_id": 0,
+    "title": "Detected Trip 1",
+    "photo_count": 2,
+    "start_date": "2026-01-12T10:00:00",
+    "end_date": "2026-01-12T14:30:00",
+    "center": {
+      "latitude": 48.8575,
+      "longitude": 2.32335
+    },
+    "points": [
+      {
+        "filename": "paris_1.jpg",
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "timestamp": "2026-01-12T10:00:00"
+      },
+      {
+        "filename": "paris_2.jpg",
+        "latitude": 48.8584,
+        "longitude": 2.2945,
+        "timestamp": "2026-01-12T14:30:00"
+      }
+    ]
+  },
+  {
+    "cluster_id": 1,
+    "title": "Detected Trip 2",
+    "photo_count": 2,
+    "start_date": "2026-01-14T11:15:00",
+    "end_date": "2026-01-14T17:45:00",
+    "center": {
+      "latitude": 49.11745,
+      "longitude": 6.17395
+    },
+    "points": [
+      {
+        "filename": "metz_1.jpg",
+        "latitude": 49.1193,
+        "longitude": 6.1757,
+        "timestamp": "2026-01-14T11:15:00"
+      },
+      {
+        "filename": "metz_2.jpg",
+        "latitude": 49.1156,
+        "longitude": 6.1722,
+        "timestamp": "2026-01-14T17:45:00"
+      }
+    ]
+  },
+  {
+    "cluster_id": 2,
+    "title": "Detected Trip 3",
+    "photo_count": 2,
+    "start_date": "2026-01-18T09:20:00",
+    "end_date": "2026-01-18T16:10:00",
+    "center": {
+      "latitude": 47.3718,
+      "longitude": 8.54585
+    },
+    "points": [
+      {
+        "filename": "zurich_1.jpg",
+        "latitude": 47.3769,
+        "longitude": 8.5417,
+        "timestamp": "2026-01-18T09:20:00"
+      },
+      {
+        "filename": "zurich_2.jpg",
+        "latitude": 47.3667,
+        "longitude": 8.55,
+        "timestamp": "2026-01-18T16:10:00"
+      }
+    ]
+  },
+  {
+    "cluster_id": 3,
+    "title": "Detected Trip 4",
+    "photo_count": 2,
+    "start_date": "2026-01-21T12:00:00",
+    "end_date": "2026-01-21T18:35:00",
+    "center": {
+      "latitude": 45.47115,
+      "longitude": 9.2086
+    },
+    "points": [
+      {
+        "filename": "milan_1.jpg",
+        "latitude": 45.4642,
+        "longitude": 9.19,
+        "timestamp": "2026-01-21T12:00:00"
+      },
+      {
+        "filename": "milan_2.jpg",
+        "latitude": 45.4781,
+        "longitude": 9.2272,
+        "timestamp": "2026-01-21T18:35:00"
+      }
+    ]
+  }
+]
