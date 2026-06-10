@@ -26,6 +26,7 @@ type GeneratedTrip = {
   dates: string;
   photos: number;
   coordinates: string;
+  confidence: "High" | "Medium" | "Low";
   points: TravelPoint[];
 };
 
@@ -51,6 +52,18 @@ function formatCoordinate(value: string, directionPositive: string, directionNeg
   }
 
   return `${Math.abs(num).toFixed(4)}° ${num >= 0 ? directionPositive : directionNegative}`;
+}
+
+function getTripConfidence(pointCount: number): "High" | "Medium" | "Low" {
+  if (pointCount >= 5) {
+    return "High";
+  }
+
+  if (pointCount >= 3) {
+    return "Medium";
+  }
+
+  return "Low";
 }
 
 function calculateDistanceMiles(
@@ -133,7 +146,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
     const startDate = formatDate(firstPoint.timestamp);
     const endDate = formatDate(lastPoint.timestamp);
 
-    return {
+   return {
       title: getLocationName(avgLat, avgLng),
       dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
       photos: sortedTripPoints.length,
@@ -142,6 +155,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
         "N",
         "S"
       )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
+      confidence: getTripConfidence(sortedTripPoints.length),
       points: sortedTripPoints,
     };
   });
@@ -290,8 +304,14 @@ export default function TripsPage() {
                     <h2 className="mt-1 text-2xl font-bold">{trip.title}</h2>
                   </div>
 
-                  <div className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
-                    {trip.photos} photo{trip.photos === 1 ? "" : "s"}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
+                      {trip.photos} photo{trip.photos === 1 ? "" : "s"}
+                    </div>
+
+                    <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
+                      {trip.confidence} confidence
+                    </div>
                   </div>
                 </div>
 
