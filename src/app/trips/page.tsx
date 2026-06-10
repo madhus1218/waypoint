@@ -337,9 +337,12 @@ export default function TripsPage() {
               <RouteMapPreview points={points} />
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <button className="rounded-full bg-blue-500 px-5 py-3 font-semibold text-white transition hover:bg-blue-400">
-                  Save trip history
-                </button>
+                <Link
+                  href="/upload"
+                  className="rounded-full bg-blue-500 px-5 py-3 text-center font-semibold text-white transition hover:bg-blue-400"
+                >
+                  Upload another CSV
+                </Link>
 
                 <button className="rounded-full border border-white/15 px-5 py-3 font-semibold text-white/90 transition hover:border-white/40 hover:bg-white/5">
                   Share preview
