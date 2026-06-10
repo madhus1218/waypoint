@@ -167,6 +167,41 @@ export default function TripsPage() {
   }, []);
 
   const trips = useMemo(() => generateTrips(points), [points]);
+  const tripStats = useMemo(() => {
+    const namedLocations = trips.filter(
+      (trip) => trip.title !== "Unnamed Travel Stop"
+    ).length;
+
+    const timestamps = points
+      .map((point) => new Date(point.timestamp))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    let travelDays = 0;
+
+    if (timestamps.length > 0) {
+      const firstDate = timestamps[0];
+      const lastDate = timestamps[timestamps.length - 1];
+
+      travelDays =
+        Math.ceil(
+          (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1;
+    }
+
+    return {
+      tripsDetected: trips.length,
+      photosUploaded: points.length,
+      travelDays,
+      namedLocations,
+    };
+  }, [points, trips]);
+
+  function handleClearData() {
+    localStorage.removeItem("waypoint-points");
+    setPoints([]);
+  }
+
 
   if (points.length === 0) {
     return (
@@ -206,8 +241,17 @@ export default function TripsPage() {
             Back to upload
           </Link>
 
-          <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
-            Generated Trips
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClearData}
+              className="rounded-full border border-red-300/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:border-red-300/40 hover:bg-red-400/10"
+            >
+              Clear data
+            </button>
+
+            <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
+              Generated Trips
+            </div>
           </div>
         </nav>
 
@@ -225,6 +269,12 @@ export default function TripsPage() {
             This page now reads your uploaded CSV data from the browser and
             groups timestamped GPS points into trip cards.
           </p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Trips detected" value={tripStats.tripsDetected} />
+            <StatCard label="Photos uploaded" value={tripStats.photosUploaded} />
+            <StatCard label="Travel days" value={tripStats.travelDays} />
+            <StatCard label="Named locations" value={tripStats.namedLocations} />
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -300,5 +350,13 @@ export default function TripsPage() {
         </div>
       </section>
     </main>
+  );
+}
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+    </div>
   );
 }
