@@ -163,6 +163,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
 
 export default function TripsPage() {
   const [points, setPoints] = useState<TravelPoint[]>([]);
+  const [expandedTripIndex, setExpandedTripIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const savedPoints = localStorage.getItem("waypoint-points");
@@ -214,6 +215,7 @@ export default function TripsPage() {
   function handleClearData() {
     localStorage.removeItem("waypoint-points");
     setPoints([]);
+    setExpandedTripIndex(null);
   }
 
 
@@ -335,6 +337,39 @@ export default function TripsPage() {
                     {trip.points.length > 3 ? " ..." : ""}
                   </div>
                 </div>
+
+                <button
+                  onClick={() =>
+                    setExpandedTripIndex(expandedTripIndex === index ? null : index)
+                  }
+                  className="mt-5 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-blue-300/50 hover:bg-blue-400/10"
+                >
+                  {expandedTripIndex === index ? "Hide details" : "View details"}
+                </button>
+
+                {expandedTripIndex === index && (
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <p className="mb-3 text-sm font-semibold text-slate-200">
+                      Photo points in this trip
+                    </p>
+
+                    <div className="space-y-3">
+                      {trip.points.map((point, pointIndex) => (
+                        <div
+                          key={`${point.filename}-${pointIndex}`}
+                          className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300"
+                        >
+                          <p className="font-semibold text-white">{point.filename}</p>
+                          <p className="mt-1">{formatDate(point.timestamp)}</p>
+                          <p className="mt-1">
+                            {point.latitude}, {point.longitude}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
