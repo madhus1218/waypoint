@@ -27,6 +27,9 @@ type GeneratedTrip = {
   photos: number;
   coordinates: string;
   confidence: "High" | "Medium" | "Low";
+  insight: string;
+  startTimestamp: string;
+  endTimestamp: string;
   points: TravelPoint[];
 };
 
@@ -64,6 +67,33 @@ function getTripConfidence(pointCount: number): "High" | "Medium" | "Low" {
   }
 
   return "Low";
+}
+
+function getTripInsight(
+  title: string,
+  pointCount: number,
+  startTimestamp: string,
+  endTimestamp: string
+) {
+  const startDate = new Date(startTimestamp);
+  const endDate = new Date(endTimestamp);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return `${pointCount} photo point${pointCount === 1 ? "" : "s"} grouped near ${title}.`;
+  }
+
+  const dayCount =
+    Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+  if (pointCount === 1) {
+    return `1 photo point detected near ${title}.`;
+  }
+
+  return `${pointCount} photo points grouped near ${title} over ${dayCount} day${
+    dayCount === 1 ? "" : "s"
+  }.`;
 }
 
 function calculateDistanceMiles(
@@ -126,39 +156,58 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
     }
   });
 
-    return clusters.map((tripPoints, index) => {
-    const sortedTripPoints = [...tripPoints].sort(
+  return clusters
+    .map((tripPoints) => {
+      const sortedTripPoints = [...tripPoints].sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      const firstPoint = sortedTripPoints[0];
+      const lastPoint = sortedTripPoints[sortedTripPoints.length - 1];
+
+      const avgLat =
+        sortedTripPoints.reduce(
+          (sum, point) => sum + Number(point.latitude),
+          0
+        ) / sortedTripPoints.length;
+
+      const avgLng =
+        sortedTripPoints.reduce(
+          (sum, point) => sum + Number(point.longitude),
+          0
+        ) / sortedTripPoints.length;
+
+      const startDate = formatDate(firstPoint.timestamp);
+      const endDate = formatDate(lastPoint.timestamp);
+      const tripTitle = getLocationName(avgLat, avgLng);
+
+      return {
+        title: tripTitle,
+        dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
+        photos: sortedTripPoints.length,
+        coordinates: `${formatCoordinate(
+          String(avgLat),
+          "N",
+          "S"
+        )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
+        confidence: getTripConfidence(sortedTripPoints.length),
+        insight: getTripInsight(
+          tripTitle,
+          sortedTripPoints.length,
+          firstPoint.timestamp,
+          lastPoint.timestamp
+        ),
+        startTimestamp: firstPoint.timestamp,
+        endTimestamp: lastPoint.timestamp,
+        points: sortedTripPoints,
+      };
+    })
+    .sort(
       (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        new Date(a.startTimestamp).getTime() -
+        new Date(b.startTimestamp).getTime()
     );
-
-    const firstPoint = sortedTripPoints[0];
-    const lastPoint = sortedTripPoints[sortedTripPoints.length - 1];
-
-    const avgLat =
-      sortedTripPoints.reduce((sum, point) => sum + Number(point.latitude), 0) /
-      sortedTripPoints.length;
-
-    const avgLng =
-      sortedTripPoints.reduce((sum, point) => sum + Number(point.longitude), 0) /
-      sortedTripPoints.length;
-
-    const startDate = formatDate(firstPoint.timestamp);
-    const endDate = formatDate(lastPoint.timestamp);
-
-   return {
-      title: getLocationName(avgLat, avgLng),
-      dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
-      photos: sortedTripPoints.length,
-      coordinates: `${formatCoordinate(
-        String(avgLat),
-        "N",
-        "S"
-      )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
-      confidence: getTripConfidence(sortedTripPoints.length),
-      points: sortedTripPoints,
-    };
-  });
 }
 
 export default function TripsPage() {
@@ -294,16 +343,21 @@ export default function TripsPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="space-y-4">
+          <div className="space-y-4 border-l border-blue-400/20 pl-6">
             {trips.map((trip, index) => (
               <div
                 key={`${trip.title}-${trip.dates}`}
-                className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-blue-400/40 hover:bg-white/[0.07]"
+                className="relative rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-blue-400/40 hover:bg-white/[0.07]"
               >
+                <div className="absolute -left-3 top-8 h-6 w-6 rounded-full border-4 border-[#07111f] bg-blue-400" />
+
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm text-blue-200">Trip {index + 1}</p>
+                    <p className="text-sm text-blue-200">Timeline stop {index + 1}</p>
                     <h2 className="mt-1 text-2xl font-bold">{trip.title}</h2>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
+                      {trip.insight}
+                    </p>
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
