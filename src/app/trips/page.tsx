@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import RouteMapPreview from "@/components/RouteMapPreview";
+import { getLocationName } from "@/lib/locationNames";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -112,7 +113,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
     }
   });
 
-  return clusters.map((tripPoints, index) => {
+    return clusters.map((tripPoints, index) => {
     const sortedTripPoints = [...tripPoints].sort(
       (a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -133,7 +134,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
     const endDate = formatDate(lastPoint.timestamp);
 
     return {
-      title: `Detected Location Cluster ${index + 1}`,
+      title: getLocationName(avgLat, avgLng),
       dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
       photos: sortedTripPoints.length,
       coordinates: `${formatCoordinate(
