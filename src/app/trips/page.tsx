@@ -213,6 +213,7 @@ function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
 export default function TripsPage() {
   const [points, setPoints] = useState<TravelPoint[]>([]);
   const [expandedTripIndex, setExpandedTripIndex] = useState<number | null>(null);
+  const [customTripTitles, setCustomTripTitles] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const savedPoints = localStorage.getItem("waypoint-points");
@@ -229,6 +230,28 @@ export default function TripsPage() {
       setPoints([]);
     }
   }, []);
+
+  useEffect(() => {
+    const savedTitles = localStorage.getItem("waypoint-custom-trip-titles");
+
+    if (!savedTitles) {
+      return;
+    }
+
+    try {
+      const parsedTitles = JSON.parse(savedTitles) as Record<number, string>;
+      setCustomTripTitles(parsedTitles);
+    } catch {
+      setCustomTripTitles({});
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "waypoint-custom-trip-titles",
+      JSON.stringify(customTripTitles)
+    );
+  }, [customTripTitles]);
 
   const trips = useMemo(() => generateTrips(points), [points]);
   const tripStats = useMemo(() => {
@@ -263,8 +286,17 @@ export default function TripsPage() {
 
   function handleClearData() {
     localStorage.removeItem("waypoint-points");
+    localStorage.removeItem("waypoint-custom-trip-titles");
     setPoints([]);
     setExpandedTripIndex(null);
+    setCustomTripTitles({});
+  }
+
+  function handleTripTitleChange(index: number, title: string) {
+    setCustomTripTitles((currentTitles) => ({
+      ...currentTitles,
+      [index]: title,
+    }));
   }
 
 
@@ -354,7 +386,13 @@ export default function TripsPage() {
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm text-blue-200">Timeline stop {index + 1}</p>
-                    <h2 className="mt-1 text-2xl font-bold">{trip.title}</h2>
+                    <input
+                      value={customTripTitles[index] ?? trip.title}
+                      onChange={(event) => handleTripTitleChange(index, event.target.value)}
+                      className="mt-1 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-2xl font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-300/50 focus:bg-white/10"
+                      aria-label={`Edit title for trip ${index + 1}`}
+                    />
+
                     <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
                       {trip.insight}
                     </p>
@@ -404,7 +442,7 @@ export default function TripsPage() {
                 {expandedTripIndex === index && (
                   <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
                     <p className="mb-3 text-sm font-semibold text-slate-200">
-                      Photo points in this trip
+                      Photo points in {customTripTitles[index] ?? trip.title}
                     </p>
 
                     <div className="space-y-3">
