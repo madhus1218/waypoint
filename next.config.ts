@@ -1,15 +1,16 @@
 import type { NextConfig } from "next";
 
-const repoName = "waypoint";
+const isGithubPages = process.env.GITHUB_PAGES === "true";
 
 const nextConfig: NextConfig = {
-  output: "export",
-  trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
-  basePath: process.env.NODE_ENV === "production" ? `/${repoName}` : "",
-  assetPrefix: process.env.NODE_ENV === "production" ? `/${repoName}/` : "",
+  ...(isGithubPages
+    ? {
+        output: "export" as const,
+        images: {
+          unoptimized: true,
+        },
+      }
+    : {}),
 };
 
 export default nextConfig;
