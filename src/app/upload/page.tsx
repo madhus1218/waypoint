@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { Upload, FileText, MapPin, Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -12,10 +13,183 @@ type TravelPoint = {
   timestamp: string;
 };
 
+type GeneratedTrip = {
+  title: string;
+  startTimestamp: string;
+  endTimestamp: string;
+  insight: string;
+  points: TravelPoint[];
+};
+
+function formatDate(timestamp: string) {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function calculateDistanceMiles(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const earthRadiusMiles = 3958.8;
+
+  const latDistance = ((lat2 - lat1) * Math.PI) / 180;
+  const lonDistance = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(lonDistance / 2) *
+      Math.sin(lonDistance / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMiles * c;
+}
+
+function getLocationName(latitude: number, longitude: number) {
+  if (latitude >= 48 && latitude <= 49.5 && longitude >= 1.5 && longitude <= 3) {
+    return "Paris, France";
+  }
+
+  if (latitude >= 48.5 && latitude <= 50 && longitude >= 5.5 && longitude <= 7) {
+    return "Metz, France";
+  }
+
+  if (latitude >= 46.5 && latitude <= 48 && longitude >= 7.5 && longitude <= 9.5) {
+    return "Zurich, Switzerland";
+  }
+
+  return "Unnamed Travel Stop";
+}
+
+function getTripInsight(
+  title: string,
+  pointCount: number,
+  startTimestamp: string,
+  endTimestamp: string
+) {
+  const startDate = new Date(startTimestamp);
+  const endDate = new Date(endTimestamp);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return `${pointCount} photo point${pointCount === 1 ? "" : "s"} grouped near ${title}.`;
+  }
+
+  const dayCount =
+    Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+  if (pointCount === 1) {
+    return `1 photo point detected near ${title}.`;
+  }
+
+  return `${pointCount} photo points grouped near ${title} over ${dayCount} day${
+    dayCount === 1 ? "" : "s"
+  }.`;
+}
+
+function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
+  const sortedPoints = [...points].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const clusters: TravelPoint[][] = [];
+  const maxDistanceMiles = 75;
+
+  sortedPoints.forEach((point) => {
+    const lat = Number(point.latitude);
+    const lng = Number(point.longitude);
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return;
+    }
+
+    const matchingCluster = clusters.find((cluster) => {
+      const clusterLat =
+        cluster.reduce((sum, item) => sum + Number(item.latitude), 0) /
+        cluster.length;
+
+      const clusterLng =
+        cluster.reduce((sum, item) => sum + Number(item.longitude), 0) /
+        cluster.length;
+
+      const distance = calculateDistanceMiles(lat, lng, clusterLat, clusterLng);
+
+      return distance <= maxDistanceMiles;
+    });
+
+    if (matchingCluster) {
+      matchingCluster.push(point);
+    } else {
+      clusters.push([point]);
+    }
+  });
+
+  return clusters
+    .map((tripPoints) => {
+      const sortedTripPoints = [...tripPoints].sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      const firstPoint = sortedTripPoints[0];
+      const lastPoint = sortedTripPoints[sortedTripPoints.length - 1];
+
+      const avgLat =
+        sortedTripPoints.reduce(
+          (sum, point) => sum + Number(point.latitude),
+          0
+        ) / sortedTripPoints.length;
+
+      const avgLng =
+        sortedTripPoints.reduce(
+          (sum, point) => sum + Number(point.longitude),
+          0
+        ) / sortedTripPoints.length;
+
+      const title = getLocationName(avgLat, avgLng);
+
+      return {
+        title,
+        startTimestamp: firstPoint.timestamp,
+        endTimestamp: lastPoint.timestamp,
+        insight: getTripInsight(
+          title,
+          sortedTripPoints.length,
+          firstPoint.timestamp,
+          lastPoint.timestamp
+        ),
+        points: sortedTripPoints,
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.startTimestamp).getTime() -
+        new Date(b.startTimestamp).getTime()
+    );
+}
+
 export default function UploadPage() {
+  const router = useRouter();
+
   const [points, setPoints] = useState<TravelPoint[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveMessage, setSaveMessage] = useState("");
 
   function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -52,6 +226,71 @@ export default function UploadPage() {
       },
     });
   }
+
+  async function handleGenerateAndSaveTrips() {
+  if (points.length === 0) {
+    setSaveStatus("error");
+    setSaveMessage("Upload a valid CSV before generating trips.");
+    return;
+  }
+
+  try {
+    setSaveStatus("saving");
+    setSaveMessage("Generating and saving trips...");
+
+    const generatedTrips = generateTrips(points);
+
+    if (generatedTrips.length === 0) {
+      setSaveStatus("error");
+      setSaveMessage("No trips could be generated from this CSV.");
+      return;
+    }
+
+    await Promise.all(
+      generatedTrips.map(async (trip) => {
+        const response = await fetch("/api/trips", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: trip.title,
+            startDate: trip.startTimestamp,
+            endDate: trip.endTimestamp,
+            city: trip.title,
+            country: null,
+            notes: trip.insight,
+            photoPoints: trip.points.map((point) => ({
+              filename: point.filename,
+              latitude: Number(point.latitude),
+              longitude: Number(point.longitude),
+              takenAt: point.timestamp,
+            })),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to save trip");
+        }
+
+        return data.trip;
+      })
+    );
+
+    setSaveStatus("saved");
+    setSaveMessage(
+      `Saved ${generatedTrips.length} trip${generatedTrips.length === 1 ? "" : "s"}. Redirecting...`
+    );
+
+    router.push("/trips");
+  } catch (err) {
+    console.error("Failed to generate and save trips:", err);
+    setSaveStatus("error");
+    setSaveMessage("Could not save trips. Check your database connection.");
+  }
+}
 
   return (
     <main className="min-h-screen bg-[#07111f] px-6 py-8 text-white">
@@ -164,12 +403,22 @@ photo3.jpg,47.3769,8.5417,2026-01-18T09:15:00`}
                 </p>
               </div>
 
-              <Link
-                href="/trips"
-                className="rounded-full bg-blue-500 px-6 py-3 text-center font-semibold text-white transition hover:bg-blue-400"
+              <button
+                onClick={handleGenerateAndSaveTrips}
+                disabled={saveStatus === "saving"}
+                className="rounded-full bg-blue-500 px-6 py-3 text-center font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Generate trips
-              </Link>
+                {saveStatus === "saving" ? "Saving trips..." : "Generate & save trips"}
+              </button>
+              {saveMessage && (
+                <p
+                  className={`mt-3 text-sm ${
+                    saveStatus === "error" ? "text-red-300" : "text-blue-200"
+                  }`}
+                >
+                  {saveMessage}
+                </p>
+              )}
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-white/10">

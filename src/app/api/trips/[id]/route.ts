@@ -68,7 +68,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       { status: 500 }
     );
   }
-
+}
   export async function PATCH(request: Request, { params }: RouteParams) {
     try {
         const { id } = await params;
@@ -121,5 +121,4 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
         { status: 500 }
         );
     }
-  }
 }

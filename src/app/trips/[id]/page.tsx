@@ -99,9 +99,13 @@ export default function TripDetailPage() {
   const tripId = params.id as string;
   const router = useRouter();
 
-  const [trip, setTrip] = useState<SavedTrip | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+    const [trip, setTrip] = useState<SavedTrip | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedTitle, setEditedTitle] = useState("");
+    const [editedNotes, setEditedNotes] = useState("");
+    const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   async function fetchTrip() {
     try {
@@ -118,7 +122,9 @@ export default function TripDetailPage() {
         throw new Error(data.error || "Failed to fetch trip");
     }
 
-   setTrip(data.trip);
+    setTrip(data.trip);
+    setEditedTitle(data.trip.title);
+    setEditedNotes(data.trip.notes || "");
 
     } catch (err) {
       console.error("Failed to fetch trip:", err);
@@ -152,6 +158,44 @@ export default function TripDetailPage() {
     } catch (err) {
         console.error("Failed to delete trip:", err);
         setError("Could not delete this trip.");
+        }
+    }
+
+    async function handleSaveTripEdits() {
+        if (!trip) {
+            return;
+        }
+
+        try {
+            setSaveStatus("saving");
+
+            const response = await fetch(`/api/trips/${tripId}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                title: editedTitle,
+                city: editedTitle,
+                country: trip.country,
+                notes: editedNotes,
+            }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+            throw new Error(data.error || "Failed to update trip");
+            }
+
+            setTrip(data.trip);
+            setEditedTitle(data.trip.title);
+            setEditedNotes(data.trip.notes || "");
+            setIsEditing(false);
+            setSaveStatus("saved");
+        } catch (err) {
+            console.error("Failed to save trip edits:", err);
+            setSaveStatus("error");
         }
     }
 
@@ -231,17 +275,93 @@ export default function TripDetailPage() {
             </nav>
 
         <div className="mb-10 rounded-[2rem] border border-white/10 bg-white/5 p-8">
-          <p className="text-sm text-blue-200">Saved Waypoint trip</p>
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
+                <div className="flex-1">
+                    <p className="text-sm text-blue-200">Saved Waypoint trip</p>
 
-          <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
-            {trip.title}
-          </h1>
+                    {isEditing ? (
+                    <div className="mt-3 space-y-4">
+                        <input
+                        value={editedTitle}
+                        onChange={(event) => setEditedTitle(event.target.value)}
+                        className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-3xl font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-300/50 focus:bg-white/10 md:text-5xl"
+                        placeholder="Trip title"
+                        />
 
-          {trip.notes && (
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-              {trip.notes}
-            </p>
-          )}
+                        <textarea
+                        value={editedNotes}
+                        onChange={(event) => setEditedNotes(event.target.value)}
+                        className="min-h-32 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-base leading-7 text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-blue-300/50 focus:bg-white/10"
+                        placeholder="Add notes about this trip..."
+                        />
+                    </div>
+                    ) : (
+                    <>
+                        <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
+                        {trip.title}
+                        </h1>
+
+                        {trip.notes ? (
+                        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
+                            {trip.notes}
+                        </p>
+                        ) : (
+                        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-500">
+                            No notes yet.
+                        </p>
+                        )}
+                    </>
+                    )}
+                </div>
+
+                <div className="flex gap-3">
+                    {isEditing ? (
+                    <>
+                        <button
+                        onClick={() => {
+                            setIsEditing(false);
+                            setEditedTitle(trip.title);
+                            setEditedNotes(trip.notes || "");
+                            setSaveStatus("idle");
+                        }}
+                        className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-white/40 hover:bg-white/5"
+                        >
+                        Cancel
+                        </button>
+
+                        <button
+                        onClick={handleSaveTripEdits}
+                        disabled={saveStatus === "saving"}
+                        className="rounded-full bg-blue-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                        {saveStatus === "saving" ? "Saving..." : "Save"}
+                        </button>
+                    </>
+                    ) : (
+                    <button
+                        onClick={() => {
+                        setIsEditing(true);
+                        setSaveStatus("idle");
+                        }}
+                        className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-blue-300/50 hover:bg-blue-400/10"
+                    >
+                        Edit trip
+                    </button>
+                    )}
+                </div>
+                </div>
+
+                {saveStatus === "saved" && (
+                <div className="mt-5 rounded-2xl border border-blue-300/30 bg-blue-400/10 px-4 py-3 text-sm text-blue-100">
+                    Trip updated successfully.
+                </div>
+                )}
+
+                {saveStatus === "error" && (
+                <div className="mt-5 rounded-2xl border border-red-300/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+                    Could not update this trip.
+                </div>
+                )}
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             <StatCard
