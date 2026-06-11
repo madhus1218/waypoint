@@ -8,6 +8,7 @@ datasource db {
 
 model Trip {
   id          String       @id @default(cuid())
+  ownerId     String?
   title       String
   startDate   DateTime
   endDate     DateTime

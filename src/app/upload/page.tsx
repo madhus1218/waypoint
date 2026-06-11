@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { Upload, FileText, MapPin, Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { getAnonymousOwnerId } from "@/lib/anonymousUser";
 
 type TravelPoint = {
   filename: string;
@@ -229,10 +230,13 @@ export default function UploadPage() {
 
   async function handleGenerateAndSaveTrips() {
   if (points.length === 0) {
+    const ownerId = getAnonymousOwnerId();
     setSaveStatus("error");
     setSaveMessage("Upload a valid CSV before generating trips.");
     return;
   }
+
+  const ownerId = getAnonymousOwnerId();
 
   try {
     setSaveStatus("saving");
@@ -254,19 +258,20 @@ export default function UploadPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            title: trip.title,
-            startDate: trip.startTimestamp,
-            endDate: trip.endTimestamp,
-            city: trip.title,
-            country: null,
-            notes: trip.insight,
-            photoPoints: trip.points.map((point) => ({
-              filename: point.filename,
-              latitude: Number(point.latitude),
-              longitude: Number(point.longitude),
-              takenAt: point.timestamp,
-            })),
-          }),
+          ownerId,
+          title: trip.title,
+          startDate: trip.startTimestamp,
+          endDate: trip.endTimestamp,
+          city: trip.title,
+          country: null,
+          notes: trip.insight,
+          photoPoints: trip.points.map((point) => ({
+            filename: point.filename,
+            latitude: Number(point.latitude),
+            longitude: Number(point.longitude),
+            takenAt: point.timestamp,
+          })),
+        }),
         });
 
         const data = await response.json();

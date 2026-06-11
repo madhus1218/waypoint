@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getAnonymousOwnerId } from "@/lib/anonymousUser";
 import RouteMapPreview from "@/components/RouteMapPreview";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -112,7 +113,9 @@ export default function TripDetailPage() {
       setIsLoading(true);
       setError("");
 
-    const response = await fetch(`/api/trips/${tripId}`, {
+    const ownerId = getAnonymousOwnerId();
+
+    const response = await fetch(`/api/trips/${tripId}?ownerId=${ownerId}`, {
         cache: "no-store",
     });
 
@@ -144,8 +147,10 @@ export default function TripDetailPage() {
     }
 
     try {
-        const response = await fetch(`/api/trips/${tripId}`, {
-        method: "DELETE",
+        const ownerId = getAnonymousOwnerId();
+
+        const response = await fetch(`/api/trips/${tripId}?ownerId=${ownerId}`, {
+            method: "DELETE",
         });
 
         const data = await response.json();
@@ -169,8 +174,10 @@ export default function TripDetailPage() {
         try {
             setSaveStatus("saving");
 
-            const response = await fetch(`/api/trips/${tripId}`, {
-            method: "PATCH",
+            const ownerId = getAnonymousOwnerId();
+
+            const response = await fetch(`/api/trips/${tripId}?ownerId=${ownerId}`, {
+                method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
             },

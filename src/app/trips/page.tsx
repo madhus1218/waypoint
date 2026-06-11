@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getAnonymousOwnerId } from "@/lib/anonymousUser";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -88,7 +89,9 @@ export default function TripsPage() {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch("/api/trips", {
+      const ownerId = getAnonymousOwnerId();
+
+      const response = await fetch(`/api/trips?ownerId=${ownerId}`, {
         cache: "no-store",
       });
 

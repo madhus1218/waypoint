@@ -7,13 +7,20 @@ type RouteParams = {
   }>;
 };
 
-export async function GET(_request: Request, { params }: RouteParams) {
+function getOwnerIdFromRequest(request: Request) {
+  const { searchParams } = new URL(request.url);
+  return searchParams.get("ownerId");
+}
+
+export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const ownerId = getOwnerIdFromRequest(request);
 
-    const trip = await prisma.trip.findUnique({
+    const trip = await prisma.trip.findFirst({
       where: {
         id,
+        ownerId: ownerId || null,
       },
       include: {
         photoPoints: {
@@ -39,13 +46,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const ownerId = getOwnerIdFromRequest(request);
 
-    const existingTrip = await prisma.trip.findUnique({
+    const existingTrip = await prisma.trip.findFirst({
       where: {
         id,
+        ownerId: ownerId || null,
       },
     });
 
@@ -69,56 +78,59 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     );
   }
 }
-  export async function PATCH(request: Request, { params }: RouteParams) {
-    try {
-        const { id } = await params;
-        const body = await request.json();
 
-        const { title, city, country, notes } = body;
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const ownerId = getOwnerIdFromRequest(request);
+    const body = await request.json();
 
-        if (!title || title.trim().length === 0) {
-        return NextResponse.json(
-            { error: "Trip title is required" },
-            { status: 400 }
-        );
-        }
+    const { title, city, country, notes } = body;
 
-        const existingTrip = await prisma.trip.findUnique({
-        where: {
-            id,
-        },
-        });
-
-        if (!existingTrip) {
-        return NextResponse.json({ error: "Trip not found" }, { status: 404 });
-        }
-
-        const updatedTrip = await prisma.trip.update({
-        where: {
-            id,
-        },
-        data: {
-            title: title.trim(),
-            city: city?.trim() || null,
-            country: country?.trim() || null,
-            notes: notes?.trim() || null,
-        },
-        include: {
-            photoPoints: {
-            orderBy: {
-                takenAt: "asc",
-            },
-            },
-        },
-        });
-
-        return NextResponse.json({ trip: updatedTrip });
-    } catch (error) {
-        console.error("Failed to update trip:", error);
-
-        return NextResponse.json(
-        { error: "Failed to update trip" },
-        { status: 500 }
-        );
+    if (!title || title.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Trip title is required" },
+        { status: 400 }
+      );
     }
+
+    const existingTrip = await prisma.trip.findFirst({
+      where: {
+        id,
+        ownerId: ownerId || null,
+      },
+    });
+
+    if (!existingTrip) {
+      return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    }
+
+    const updatedTrip = await prisma.trip.update({
+      where: {
+        id,
+      },
+      data: {
+        title: title.trim(),
+        city: city?.trim() || null,
+        country: country?.trim() || null,
+        notes: notes?.trim() || null,
+      },
+      include: {
+        photoPoints: {
+          orderBy: {
+            takenAt: "asc",
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ trip: updatedTrip });
+  } catch (error) {
+    console.error("Failed to update trip:", error);
+
+    return NextResponse.json(
+      { error: "Failed to update trip" },
+      { status: 500 }
+    );
+  }
 }

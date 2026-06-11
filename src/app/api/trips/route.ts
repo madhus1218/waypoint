@@ -1,14 +1,44 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+type PhotoPointInput = {
+  filename?: string;
+  latitude: number;
+  longitude: number;
+  takenAt: string;
+};
+
+type CreateTripRequestBody = {
+  ownerId?: string;
+  title?: string;
+  startDate?: string;
+  endDate?: string;
+  city?: string;
+  country?: string;
+  notes?: string;
+  photoPoints?: PhotoPointInput[];
+};
+
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const ownerId = searchParams.get("ownerId");
+
     const trips = await prisma.trip.findMany({
+      where: ownerId
+        ? {
+            ownerId,
+          }
+        : undefined,
       orderBy: {
         createdAt: "desc",
       },
       include: {
-        photoPoints: true,
+        photoPoints: {
+          orderBy: {
+            takenAt: "asc",
+          },
+        },
       },
     });
 
@@ -25,9 +55,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as CreateTripRequestBody;
 
     const {
+      ownerId,
       title,
       startDate,
       endDate,
@@ -44,14 +75,32 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+
+    if (
+      Number.isNaN(parsedStartDate.getTime()) ||
+      Number.isNaN(parsedEndDate.getTime())
+    ) {
+      return NextResponse.json(
+        { error: "Invalid trip date" },
+        { status: 400 }
+      );
+    }
+
     const existingTrip = await prisma.trip.findFirst({
       where: {
+        ownerId: ownerId || null,
         title,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
       },
       include: {
-        photoPoints: true,
+        photoPoints: {
+          orderBy: {
+            takenAt: "asc",
+          },
+        },
       },
     });
 
@@ -67,31 +116,29 @@ export async function POST(request: Request) {
 
     const trip = await prisma.trip.create({
       data: {
+        ownerId: ownerId || null,
         title,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
         city: city || null,
         country: country || null,
         notes: notes || null,
         photoPoints: {
           create:
-            photoPoints?.map(
-              (point: {
-                filename?: string;
-                latitude: number;
-                longitude: number;
-                takenAt: string;
-              }) => ({
-                filename: point.filename || null,
-                latitude: Number(point.latitude),
-                longitude: Number(point.longitude),
-                takenAt: new Date(point.takenAt),
-              })
-            ) || [],
+            photoPoints?.map((point) => ({
+              filename: point.filename || null,
+              latitude: Number(point.latitude),
+              longitude: Number(point.longitude),
+              takenAt: new Date(point.takenAt),
+            })) || [],
         },
       },
       include: {
-        photoPoints: true,
+        photoPoints: {
+          orderBy: {
+            takenAt: "asc",
+          },
+        },
       },
     });
 
