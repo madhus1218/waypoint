@@ -44,6 +44,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const existingTrip = await prisma.trip.findFirst({
+      where: {
+        title,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      },
+      include: {
+        photoPoints: true,
+      },
+    });
+
+    if (existingTrip) {
+      return NextResponse.json(
+        {
+          trip: existingTrip,
+          message: "Trip already exists",
+        },
+        { status: 200 }
+      );
+    }
+
     const trip = await prisma.trip.create({
       data: {
         title,
