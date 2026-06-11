@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Route,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type SavedPhotoPoint = {
   id: string;
@@ -97,6 +97,7 @@ function getAverageCoordinate(points: SavedPhotoPoint[]) {
 export default function TripDetailPage() {
   const params = useParams();
   const tripId = params.id as string;
+  const router = useRouter();
 
   const [trip, setTrip] = useState<SavedTrip | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,25 +108,18 @@ export default function TripDetailPage() {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch("/api/trips", {
+    const response = await fetch(`/api/trips/${tripId}`, {
         cache: "no-store",
-      });
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
+    if (!response.ok) {
         throw new Error(data.error || "Failed to fetch trip");
-      }
+    }
 
-      const matchingTrip = data.trips?.find(
-        (savedTrip: SavedTrip) => savedTrip.id === tripId
-      );
+   setTrip(data.trip);
 
-      if (!matchingTrip) {
-        throw new Error("Trip not found");
-      }
-
-      setTrip(matchingTrip);
     } catch (err) {
       console.error("Failed to fetch trip:", err);
       setError("Could not load this trip.");
@@ -133,6 +127,33 @@ export default function TripDetailPage() {
       setIsLoading(false);
     }
   }
+
+  async function handleDeleteTrip() {
+    const confirmed = window.confirm(
+        "Are you sure you want to delete this trip? This cannot be undone."
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/trips/${tripId}`, {
+        method: "DELETE",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+        throw new Error(data.error || "Failed to delete trip");
+        }
+
+        router.push("/trips");
+    } catch (err) {
+        console.error("Failed to delete trip:", err);
+        setError("Could not delete this trip.");
+        }
+    }
 
   useEffect(() => {
     fetchTrip();
@@ -187,18 +208,27 @@ export default function TripDetailPage() {
     <main className="min-h-screen bg-[#07111f] px-6 py-8 text-white">
       <section className="mx-auto max-w-6xl">
         <nav className="mb-12 flex items-center justify-between">
-          <Link
-            href="/trips"
-            className="flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to trips
-          </Link>
+            <Link
+                href="/trips"
+                className="flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white"
+            >
+                <ArrowLeft className="h-4 w-4" />
+                Back to trips
+            </Link>
 
-          <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
-            Trip Detail
-          </div>
-        </nav>
+            <div className="flex items-center gap-3">
+                <button
+                onClick={handleDeleteTrip}
+                className="rounded-full border border-red-300/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:border-red-300/40 hover:bg-red-400/10"
+                >
+                Delete trip
+                </button>
+
+                <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
+                Trip Detail
+                </div>
+            </div>
+            </nav>
 
         <div className="mb-10 rounded-[2rem] border border-white/10 bg-white/5 p-8">
           <p className="text-sm text-blue-200">Saved Waypoint trip</p>
