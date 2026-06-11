@@ -1,36 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import RouteMapPreview from "@/components/RouteMapPreview";
-import { getLocationName } from "@/lib/locationNames";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
   Camera,
   MapPin,
+  Plus,
+  RefreshCw,
   Route,
   Sparkles,
   Upload,
 } from "lucide-react";
 
-type TravelPoint = {
-  filename: string;
-  latitude: string;
-  longitude: string;
-  timestamp: string;
+type SavedPhotoPoint = {
+  id: string;
+  filename: string | null;
+  latitude: number;
+  longitude: number;
+  takenAt: string;
 };
 
-type GeneratedTrip = {
+type SavedTrip = {
+  id: string;
   title: string;
-  dates: string;
-  photos: number;
-  coordinates: string;
-  confidence: "High" | "Medium" | "Low";
-  insight: string;
-  startTimestamp: string;
-  endTimestamp: string;
-  points: TravelPoint[];
+  startDate: string;
+  endDate: string;
+  city: string | null;
+  country: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  photoPoints: SavedPhotoPoint[];
 };
 
 function formatDate(timestamp: string) {
@@ -47,260 +49,123 @@ function formatDate(timestamp: string) {
   });
 }
 
-function formatCoordinate(value: string, directionPositive: string, directionNegative: string) {
-  const num = Number(value);
+function formatDateRange(startDate: string, endDate: string) {
+  const start = formatDate(startDate);
+  const end = formatDate(endDate);
 
-  if (Number.isNaN(num)) {
-    return value;
-  }
-
-  return `${Math.abs(num).toFixed(4)}° ${num >= 0 ? directionPositive : directionNegative}`;
+  return start === end ? start : `${start} – ${end}`;
 }
 
-function getTripConfidence(pointCount: number): "High" | "Medium" | "Low" {
-  if (pointCount >= 5) {
-    return "High";
-  }
-
-  if (pointCount >= 3) {
-    return "Medium";
-  }
-
-  return "Low";
+function formatCoordinate(value: number, directionPositive: string, directionNegative: string) {
+  return `${Math.abs(value).toFixed(4)}° ${value >= 0 ? directionPositive : directionNegative}`;
 }
 
-function getTripInsight(
-  title: string,
-  pointCount: number,
-  startTimestamp: string,
-  endTimestamp: string
-) {
-  const startDate = new Date(startTimestamp);
-  const endDate = new Date(endTimestamp);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return `${pointCount} photo point${pointCount === 1 ? "" : "s"} grouped near ${title}.`;
+function getAverageCoordinate(points: SavedPhotoPoint[]) {
+  if (points.length === 0) {
+    return null;
   }
 
-  const dayCount =
-    Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
+  const avgLat =
+    points.reduce((sum, point) => sum + point.latitude, 0) / points.length;
 
-  if (pointCount === 1) {
-    return `1 photo point detected near ${title}.`;
-  }
+  const avgLng =
+    points.reduce((sum, point) => sum + point.longitude, 0) / points.length;
 
-  return `${pointCount} photo points grouped near ${title} over ${dayCount} day${
-    dayCount === 1 ? "" : "s"
-  }.`;
-}
-
-function calculateDistanceMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const earthRadiusMiles = 3958.8;
-
-  const latDistance = ((lat2 - lat1) * Math.PI) / 180;
-  const lonDistance = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(lonDistance / 2) *
-      Math.sin(lonDistance / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadiusMiles * c;
-}
-
-function generateTrips(points: TravelPoint[]): GeneratedTrip[] {
-  const sortedPoints = [...points].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  const clusters: TravelPoint[][] = [];
-  const maxDistanceMiles = 75;
-
-  sortedPoints.forEach((point) => {
-    const lat = Number(point.latitude);
-    const lng = Number(point.longitude);
-
-    if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      return;
-    }
-
-    const matchingCluster = clusters.find((cluster) => {
-      const clusterLat =
-        cluster.reduce((sum, item) => sum + Number(item.latitude), 0) /
-        cluster.length;
-
-      const clusterLng =
-        cluster.reduce((sum, item) => sum + Number(item.longitude), 0) /
-        cluster.length;
-
-      const distance = calculateDistanceMiles(lat, lng, clusterLat, clusterLng);
-
-      return distance <= maxDistanceMiles;
-    });
-
-    if (matchingCluster) {
-      matchingCluster.push(point);
-    } else {
-      clusters.push([point]);
-    }
-  });
-
-  return clusters
-    .map((tripPoints) => {
-      const sortedTripPoints = [...tripPoints].sort(
-        (a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-
-      const firstPoint = sortedTripPoints[0];
-      const lastPoint = sortedTripPoints[sortedTripPoints.length - 1];
-
-      const avgLat =
-        sortedTripPoints.reduce(
-          (sum, point) => sum + Number(point.latitude),
-          0
-        ) / sortedTripPoints.length;
-
-      const avgLng =
-        sortedTripPoints.reduce(
-          (sum, point) => sum + Number(point.longitude),
-          0
-        ) / sortedTripPoints.length;
-
-      const startDate = formatDate(firstPoint.timestamp);
-      const endDate = formatDate(lastPoint.timestamp);
-      const tripTitle = getLocationName(avgLat, avgLng);
-
-      return {
-        title: tripTitle,
-        dates: startDate === endDate ? startDate : `${startDate} – ${endDate}`,
-        photos: sortedTripPoints.length,
-        coordinates: `${formatCoordinate(
-          String(avgLat),
-          "N",
-          "S"
-        )}, ${formatCoordinate(String(avgLng), "E", "W")}`,
-        confidence: getTripConfidence(sortedTripPoints.length),
-        insight: getTripInsight(
-          tripTitle,
-          sortedTripPoints.length,
-          firstPoint.timestamp,
-          lastPoint.timestamp
-        ),
-        startTimestamp: firstPoint.timestamp,
-        endTimestamp: lastPoint.timestamp,
-        points: sortedTripPoints,
-      };
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.startTimestamp).getTime() -
-        new Date(b.startTimestamp).getTime()
-    );
+  return {
+    latitude: avgLat,
+    longitude: avgLng,
+  };
 }
 
 export default function TripsPage() {
-  const [points, setPoints] = useState<TravelPoint[]>([]);
-  const [expandedTripIndex, setExpandedTripIndex] = useState<number | null>(null);
-  const [customTripTitles, setCustomTripTitles] = useState<Record<number, string>>({});
+  const [trips, setTrips] = useState<SavedTrip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+
+  async function fetchTrips() {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const response = await fetch("/api/trips", {
+        cache: "no-store",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch trips");
+      }
+
+      setTrips(data.trips || []);
+    } catch (err) {
+      console.error("Failed to fetch trips:", err);
+      setError("Could not load saved trips. Check your database connection.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const savedPoints = localStorage.getItem("waypoint-points");
-
-    if (!savedPoints) {
-      setPoints([]);
-      return;
-    }
-
-    try {
-      const parsedPoints = JSON.parse(savedPoints) as TravelPoint[];
-      setPoints(parsedPoints);
-    } catch {
-      setPoints([]);
-    }
+    fetchTrips();
   }, []);
 
-  useEffect(() => {
-    const savedTitles = localStorage.getItem("waypoint-custom-trip-titles");
-
-    if (!savedTitles) {
-      return;
-    }
-
-    try {
-      const parsedTitles = JSON.parse(savedTitles) as Record<number, string>;
-      setCustomTripTitles(parsedTitles);
-    } catch {
-      setCustomTripTitles({});
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "waypoint-custom-trip-titles",
-      JSON.stringify(customTripTitles)
+  const stats = useMemo(() => {
+    const totalPhotoPoints = trips.reduce(
+      (sum, trip) => sum + trip.photoPoints.length,
+      0
     );
-  }, [customTripTitles]);
 
-  const trips = useMemo(() => generateTrips(points), [points]);
-  const tripStats = useMemo(() => {
-    const namedLocations = trips.filter(
-      (trip) => trip.title !== "Unnamed Travel Stop"
-    ).length;
-
-    const timestamps = points
-      .map((point) => new Date(point.timestamp))
-      .filter((date) => !Number.isNaN(date.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    let travelDays = 0;
-
-    if (timestamps.length > 0) {
-      const firstDate = timestamps[0];
-      const lastDate = timestamps[timestamps.length - 1];
-
-      travelDays =
-        Math.ceil(
-          (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1;
-    }
+    const uniqueLocations = new Set(
+      trips.map((trip) => trip.city || trip.title).filter(Boolean)
+    ).size;
 
     return {
-      tripsDetected: trips.length,
-      photosUploaded: points.length,
-      travelDays,
-      namedLocations,
+      tripsSaved: trips.length,
+      photoPoints: totalPhotoPoints,
+      locations: uniqueLocations,
     };
-  }, [points, trips]);
+  }, [trips]);
 
-  function handleClearData() {
-    localStorage.removeItem("waypoint-points");
-    localStorage.removeItem("waypoint-custom-trip-titles");
-    setPoints([]);
-    setExpandedTripIndex(null);
-    setCustomTripTitles({});
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07111f] px-6 text-white">
+        <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-3xl bg-blue-500/20 text-blue-300">
+            <RefreshCw className="h-7 w-7 animate-spin" />
+          </div>
+
+          <h1 className="text-3xl font-bold">Loading saved trips...</h1>
+
+          <p className="mt-4 text-slate-300">
+            Waypoint is pulling your trip history from the database.
+          </p>
+        </section>
+      </main>
+    );
   }
 
-  function handleTripTitleChange(index: number, title: string) {
-    setCustomTripTitles((currentTitles) => ({
-      ...currentTitles,
-      [index]: title,
-    }));
+  if (error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07111f] px-6 text-white">
+        <section className="max-w-xl rounded-[2rem] border border-red-300/20 bg-red-400/10 p-8 text-center">
+          <h1 className="text-3xl font-bold">Could not load trips.</h1>
+
+          <p className="mt-4 leading-7 text-red-100">{error}</p>
+
+          <button
+            onClick={fetchTrips}
+            className="mt-7 rounded-full bg-blue-500 px-7 py-3 font-semibold text-white transition hover:bg-blue-400"
+          >
+            Try again
+          </button>
+        </section>
+      </main>
+    );
   }
 
-
-  if (points.length === 0) {
+  if (trips.length === 0) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#07111f] px-6 text-white">
         <section className="max-w-xl rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center">
@@ -308,11 +173,11 @@ export default function TripsPage() {
             <Upload className="h-7 w-7" />
           </div>
 
-          <h1 className="text-3xl font-bold">No metadata uploaded yet.</h1>
+          <h1 className="text-3xl font-bold">No saved trips yet.</h1>
 
           <p className="mt-4 leading-7 text-slate-300">
-            Upload a CSV first so Waypoint can generate your trip timeline from
-            real location points.
+            Upload a CSV, generate trips, and save them to build your Waypoint
+            travel history.
           </p>
 
           <Link
@@ -331,128 +196,142 @@ export default function TripsPage() {
       <section className="mx-auto max-w-6xl">
         <nav className="mb-12 flex items-center justify-between">
           <Link
-            href="/upload"
+            href="/"
             className="flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to upload
+            Back to home
           </Link>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={handleClearData}
-              className="rounded-full border border-red-300/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:border-red-300/40 hover:bg-red-400/10"
+              onClick={fetchTrips}
+              className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-300/40 hover:text-white"
             >
-              Clear data
+              <RefreshCw className="h-4 w-4" />
+              Refresh
             </button>
 
-            <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
-              Generated Trips
-            </div>
+            <Link
+              href="/upload"
+              className="flex items-center gap-2 rounded-full bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-400"
+            >
+              <Plus className="h-4 w-4" />
+              New upload
+            </Link>
           </div>
         </nav>
 
         <div className="mb-10">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-400/10 px-4 py-2 text-sm text-blue-200">
             <Sparkles className="h-4 w-4" />
-            Dynamic trip inference preview
+            Saved trip history
           </div>
 
           <h1 className="max-w-4xl text-4xl font-bold tracking-tight md:text-6xl">
-            Waypoint detected {trips.length} trip{trips.length === 1 ? "" : "s"} from your uploaded metadata.
+            Your Waypoint travel timeline.
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            This page now reads your uploaded CSV data from the browser and
-            groups timestamped GPS points into trip cards.
+            These trips are now loaded from your database, not just browser
+            localStorage.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Trips detected" value={tripStats.tripsDetected} />
-            <StatCard label="Photos uploaded" value={tripStats.photosUploaded} />
-            <StatCard label="Travel days" value={tripStats.travelDays} />
-            <StatCard label="Named locations" value={tripStats.namedLocations} />
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <StatCard label="Saved trips" value={stats.tripsSaved} />
+            <StatCard label="Photo points" value={stats.photoPoints} />
+            <StatCard label="Locations" value={stats.locations} />
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="space-y-4 border-l border-blue-400/20 pl-6">
-            {trips.map((trip, index) => (
-              <div
-                key={`${trip.title}-${trip.dates}`}
-                className="relative rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-blue-400/40 hover:bg-white/[0.07]"
+        <div className="grid gap-6">
+          {trips.map((trip, index) => {
+            const averageCoordinate = getAverageCoordinate(trip.photoPoints);
+
+            return (
+              <article
+                key={trip.id}
+                className="rounded-[2rem] border border-white/10 bg-white/5 p-6 transition hover:border-blue-400/40 hover:bg-white/[0.07]"
               >
-                <div className="absolute -left-3 top-8 h-6 w-6 rounded-full border-4 border-[#07111f] bg-blue-400" />
+                <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-200">Saved trip {index + 1}</p>
 
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-blue-200">Timeline stop {index + 1}</p>
-                    <input
-                      value={customTripTitles[index] ?? trip.title}
-                      onChange={(event) => handleTripTitleChange(index, event.target.value)}
-                      className="mt-1 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-2xl font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-300/50 focus:bg-white/10"
-                      aria-label={`Edit title for trip ${index + 1}`}
-                    />
+                    <h2 className="mt-2 text-3xl font-bold">{trip.title}</h2>
 
-                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
-                      {trip.insight}
-                    </p>
+                    {trip.notes && (
+                      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+                        {trip.notes}
+                      </p>
+                    )}
+
+                    <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-300" />
+                        {formatDateRange(trip.startDate, trip.endDate)}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Camera className="h-4 w-4 text-blue-300" />
+                        {trip.photoPoints.length} photo point
+                        {trip.photoPoints.length === 1 ? "" : "s"}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-blue-300" />
+                        {averageCoordinate
+                          ? `${formatCoordinate(
+                              averageCoordinate.latitude,
+                              "N",
+                              "S"
+                            )}, ${formatCoordinate(
+                              averageCoordinate.longitude,
+                              "E",
+                              "W"
+                            )}`
+                          : "No coordinates"}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
-                      {trip.photos} photo{trip.photos === 1 ? "" : "s"}
-                    </div>
+                  <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+                    <Link
+                      href={`/trips/${trip.id}`}
+                      className="rounded-full bg-blue-500 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-400"
+                    >
+                      Open trip page
+                    </Link>
 
-                    <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-                      {trip.confidence} confidence
-                    </div>
+                    <button
+                      onClick={() =>
+                        setExpandedTripId(
+                          expandedTripId === trip.id ? null : trip.id
+                        )
+                      }
+                      className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-blue-300/50 hover:bg-blue-400/10"
+                    >
+                      {expandedTripId === trip.id ? "Hide points" : "Preview points"}
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-3 text-sm text-slate-300">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-blue-300" />
-                    {trip.dates}
-                  </div>
+                {expandedTripId === trip.id && (
+                  <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+                      <Route className="h-4 w-4 text-blue-300" />
+                      Photo points
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-blue-300" />
-                    {trip.coordinates}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Camera className="h-4 w-4 text-blue-300" />
-                    {trip.points
-                      .slice(0, 3)
-                      .map((point) => point.filename)
-                      .join(" → ")}
-                    {trip.points.length > 3 ? " ..." : ""}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() =>
-                    setExpandedTripIndex(expandedTripIndex === index ? null : index)
-                  }
-                  className="mt-5 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-blue-300/50 hover:bg-blue-400/10"
-                >
-                  {expandedTripIndex === index ? "Hide details" : "View details"}
-                </button>
-
-                {expandedTripIndex === index && (
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <p className="mb-3 text-sm font-semibold text-slate-200">
-                      Photo points in {customTripTitles[index] ?? trip.title}
-                    </p>
-
-                    <div className="space-y-3">
-                      {trip.points.map((point, pointIndex) => (
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {trip.photoPoints.map((point) => (
                         <div
-                          key={`${point.filename}-${pointIndex}`}
+                          key={point.id}
                           className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300"
                         >
-                          <p className="font-semibold text-white">{point.filename}</p>
-                          <p className="mt-1">{formatDate(point.timestamp)}</p>
+                          <p className="font-semibold text-white">
+                            {point.filename || "Untitled photo"}
+                          </p>
+                          <p className="mt-1">{formatDate(point.takenAt)}</p>
                           <p className="mt-1">
                             {point.latitude}, {point.longitude}
                           </p>
@@ -461,47 +340,15 @@ export default function TripsPage() {
                     </div>
                   </div>
                 )}
-
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5">
-            <div className="rounded-[1.5rem] bg-[#0d1b2f] p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Route summary</p>
-                  <h2 className="text-2xl font-bold">
-                    {points.length} uploaded points
-                  </h2>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-300">
-                  <Route className="h-6 w-6" />
-                </div>
-              </div>
-
-              <RouteMapPreview points={points} />
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <Link
-                  href="/upload"
-                  className="rounded-full bg-blue-500 px-5 py-3 text-center font-semibold text-white transition hover:bg-blue-400"
-                >
-                  Upload another CSV
-                </Link>
-
-                <button className="rounded-full border border-white/15 px-5 py-3 font-semibold text-white/90 transition hover:border-white/40 hover:bg-white/5">
-                  Share preview
-                </button>
-              </div>
-            </div>
-          </div>
+              </article>
+            );
+          })}
         </div>
       </section>
     </main>
   );
 }
+
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
